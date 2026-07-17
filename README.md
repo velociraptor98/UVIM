@@ -74,10 +74,21 @@ In **Preferences → External Tools**, with Neovim selected:
 Default terminal command on macOS:
 
 ```
-open -na Ghostty --args --working-directory={project} -e {nvim} --listen {pipe} "+call cursor({line},{column})" {file}
+open -na Ghostty --args --working-directory={project} -e {nvim} --listen {pipe} +{line} {file}
 ```
 
-Swap `Ghostty` for `kitty`, `WezTerm`, `Alacritty`, or whatever you use.
+Swap `Ghostty` for `kitty`, `WezTerm`, `Alacritty`, or whatever you use. What each part buys:
+
+| Part | Drop it and… |
+|---|---|
+| `open -na Ghostty --args` | Nothing launches. Ghostty does not support CLI launching on macOS; this is the documented form. |
+| `--working-directory={project}` | Neovim opens in `/` instead of the project root, so LSP root detection can't find your `.sln`. |
+| `-e` | Ghostty opens a plain shell instead of running Neovim. |
+| `--listen {pipe}` | Every click from Unity spawns a **new** window instead of reusing this one. |
+| `+{line}` | You land at the top of the file instead of on the error. |
+
+Note `--listen` only matters on cold start — once a Neovim is listening, files are sent over the
+socket and this command is never run.
 
 ## Neovim side
 

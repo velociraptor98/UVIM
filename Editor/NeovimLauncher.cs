@@ -22,15 +22,17 @@ namespace Kunal.Ide.Neovim
 		public static string DefaultServerPipe =>
 			IsWindows ? @"\\.\pipe\unity.pipe" : "/tmp/unity.pipe";
 
+		// `+{line}` rather than `+call cursor({line},{column})`: same jump, but no spaces, so the
+		// argument survives `open --args` and the shell without needing to be quoted.
 		public static string DefaultTerminalCommand
 		{
 			get
 			{
 				if (IsMacOS)
-					return "open -na Ghostty --args --working-directory={project} -e {nvim} --listen {pipe} \"+call cursor({line},{column})\" {file}";
+					return "open -na Ghostty --args --working-directory={project} -e {nvim} --listen {pipe} +{line} {file}";
 				if (IsWindows)
-					return "wt.exe -d {project} {nvim} --listen {pipe} \"+call cursor({line},{column})\" {file}";
-				return "ghostty --working-directory={project} -e {nvim} --listen {pipe} \"+call cursor({line},{column})\" {file}";
+					return "wt.exe -d {project} {nvim} --listen {pipe} +{line} {file}";
+				return "ghostty --working-directory={project} -e {nvim} --listen {pipe} +{line} {file}";
 			}
 		}
 
