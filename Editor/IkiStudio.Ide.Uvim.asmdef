@@ -1,6 +1,6 @@
 {
-    "name": "Kunal.Ide.Neovim",
-    "rootNamespace": "Kunal.Ide.Neovim",
+    "name": "IkiStudio.Ide.Uvim",
+    "rootNamespace": "IkiStudio.Ide.Uvim",
     "references": [
         "Unity.VisualStudio.Editor"
     ],

@@ -18,6 +18,9 @@ correct as Unity changes.
 
 ## Requirements
 
+- **macOS.** Spawning and focusing a terminal has no portable form, so rather than ship untested
+  defaults for Windows and Linux, this package does not register itself there at all — Unity keeps
+  offering its usual editors and nothing changes.
 - Unity 2019.4 or newer
 - `com.unity.ide.visualstudio` (ships with Unity by default; declared as a dependency)
 - Neovim on your `PATH`, or at a well-known location
@@ -27,7 +30,7 @@ correct as Unity changes.
 Package Manager → **Add package from git URL…**
 
 ```
-https://github.com/<you>/com.kunal.ide.neovim.git
+https://github.com/<you>/com.ikistudio.ide.uvim.git
 ```
 
 Then **Edit → Preferences → External Tools → External Script Editor → Neovim**.
@@ -52,7 +55,7 @@ Or always listen, from your Neovim config:
 ```lua
 vim.api.nvim_create_autocmd("VimEnter", {
   callback = function()
-    local pipe = vim.fn.has("win32") == 1 and [[\\.\pipe\unity.pipe]] or "/tmp/unity.pipe"
+    local pipe = "/tmp/unity.pipe"
     if vim.fn.filereadable(pipe) == 0 then
       pcall(vim.fn.serverstart, pipe)
     end
@@ -66,18 +69,20 @@ In **Preferences → External Tools**, with Neovim selected:
 
 | Setting | Meaning |
 |---|---|
-| **Server pipe** | Socket to look for a running Neovim on. Default `/tmp/unity.pipe` (`\\.\pipe\unity.pipe` on Windows). |
+| **Server pipe** | Socket to look for a running Neovim on. Default `/tmp/unity.pipe`. |
 | **Terminal command** | Run when nothing is listening. Placeholders: `{nvim}` `{pipe}` `{file}` `{line}` `{column}` `{project}`. |
+| **Focus command** | Run to raise the terminal after a file is sent to an already-running Neovim. Default `open -a Ghostty`. Empty means never focus. |
 | **Generate .csproj files for** | Which package types get project files. Same flags as the Visual Studio package (they share storage). |
 | **Regenerate project files** | Force a full re-sync. |
 
-Default terminal command on macOS:
+Default terminal command:
 
 ```
 open -na Ghostty --args --working-directory={project} -e {nvim} --listen {pipe} +{line} {file}
 ```
 
-Swap `Ghostty` for `kitty`, `WezTerm`, `Alacritty`, or whatever you use. What each part buys:
+Swap `Ghostty` for `kitty`, `WezTerm`, `Alacritty`, or whatever you use — in the **Focus command**
+too, which is a separate setting. What each part buys:
 
 | Part | Drop it and… |
 |---|---|
@@ -89,6 +94,43 @@ Swap `Ghostty` for `kitty`, `WezTerm`, `Alacritty`, or whatever you use. What ea
 
 Note `--listen` only matters on cold start — once a Neovim is listening, files are sent over the
 socket and this command is never run.
+
+Both commands run through the shell, so `;`, loops, and quoting all work.
+
+### cmux
+
+[cmux](https://cmux.com) is driven by a CLI rather than `open --args`:
+
+Set **Terminal command** to (as one line):
+
+```sh
+open -a cmux; for i in 1 2 3 4 5 6 7 8 9 10; do /Applications/cmux.app/Contents/Resources/bin/cmux ping >/dev/null 2>&1 && break; sleep 0.2; done; /Applications/cmux.app/Contents/Resources/bin/cmux workspace create --focus true --cwd {project} --command '{nvim} --listen {pipe} +{line} {file}'
+```
+
+and **Focus command** to `open -a cmux`.
+
+Four things that are easy to get wrong:
+
+- **`cmux` must be an absolute path.** This is the one that bites hardest, because it half-works:
+  cmux opens and then nothing loads. Unity launched from Finder or the Dock inherits a minimal
+  `PATH` — cmux is not in `/usr/local/bin`, it lives inside the app bundle and is only put on
+  `PATH` by the shell integration in terminals cmux itself spawns. So `open` (which is
+  `/usr/bin/open`) succeeds while the following `cmux` is not found. A login shell does **not**
+  fix this; nothing in your shell rc puts cmux on `PATH` either.
+- **`--command` must be wrapped in single quotes.** It takes a shell string that cmux types into
+  the workspace, not an argv list like Ghostty's `-e`. The placeholders expand to double-quoted
+  values, so double-quoting `--command` too collapses the nesting and any path containing a space
+  splits into two arguments.
+- **`--focus true` is required.** It defaults to `false`, which builds the workspace behind
+  whatever you are looking at.
+- **`open -a cmux` and the `ping` loop are not decoration.** `cmux workspace create` talks to a
+  Unix socket and fails with `Socket not found` if cmux is not already running — unlike `open -na
+  Ghostty`, it will not start the app for you. Since the terminal command only ever runs when no
+  Neovim is listening, this is exactly the cold-start case. `open -a` launches cmux (or does
+  nothing if it is up) and the bounded loop waits for the socket without spinning forever.
+
+`workspace create` was called `new-workspace` in older cmux; the old name still works but prints a
+deprecation hint.
 
 ## Neovim side
 

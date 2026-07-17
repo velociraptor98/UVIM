@@ -4,10 +4,15 @@ using Unity.CodeEditor;
 using UnityEditor;
 using UnityEngine;
 
-namespace Kunal.Ide.Neovim
+namespace IkiStudio.Ide.Uvim
 {
 	/// <summary>
 	/// Registers Neovim as an External Script Editor.
+	///
+	/// macOS only. Spawning and focusing a terminal has no portable form — every part of it
+	/// (`open -na`, `/bin/sh`, the socket in /tmp) is platform-specific — so rather than ship
+	/// defaults for platforms that are not exercised, this simply does not register elsewhere
+	/// and Unity keeps offering its usual editors.
 	///
 	/// Project file generation is delegated to the MIT-licensed generator shipped in
 	/// com.unity.ide.visualstudio rather than reimplemented, so the .csproj/.sln files
@@ -20,6 +25,9 @@ namespace Kunal.Ide.Neovim
 
 		static NeovimScriptEditor()
 		{
+			if (Application.platform != RuntimePlatform.OSXEditor)
+				return;
+
 			CodeEditor.Register(new NeovimScriptEditor());
 		}
 
@@ -76,6 +84,17 @@ namespace Kunal.Ide.Neovim
 
 			if (GUILayout.Button("Reset terminal command to default"))
 				NeovimLauncher.TerminalCommand = NeovimLauncher.DefaultTerminalCommand;
+
+			EditorGUILayout.LabelField(new GUIContent("Focus command"), EditorStyles.miniBoldLabel);
+			EditorGUILayout.HelpBox(
+				"Run to raise the terminal after sending a file to a running Neovim. " +
+				"Leave empty to never focus.",
+				MessageType.None);
+			NeovimLauncher.FocusCommand = EditorGUILayout.TextArea(
+				NeovimLauncher.FocusCommand, GUILayout.Height(19));
+
+			if (GUILayout.Button("Reset focus command to default"))
+				NeovimLauncher.FocusCommand = NeovimLauncher.DefaultFocusCommand;
 
 			EditorGUILayout.Space();
 			EditorGUILayout.LabelField("Generate .csproj files for:");

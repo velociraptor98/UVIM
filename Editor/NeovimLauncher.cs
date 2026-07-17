@@ -5,10 +5,10 @@ using UnityEditor;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
-namespace Kunal.Ide.Neovim
+namespace IkiStudio.Ide.Uvim
 {
 	/// <summary>
-	/// Opens files in Neovim.
+	/// Opens files in Neovim. macOS only — see <see cref="NeovimScriptEditor"/>.
 	///
 	/// Neovim is a terminal program, so "launching" it means one of two things:
 	///   1. A Neovim is already listening on a socket — send the file to it (fast, keeps your session).
@@ -16,25 +16,19 @@ namespace Kunal.Ide.Neovim
 	/// </summary>
 	internal static class NeovimLauncher
 	{
-		private const string PipePrefKey = "kunal_ide_neovim_pipe";
-		private const string TerminalPrefKey = "kunal_ide_neovim_terminal";
+		private const string PipePrefKey = "ikistudio_ide_uvim_pipe";
+		private const string TerminalPrefKey = "ikistudio_ide_uvim_terminal";
+		private const string FocusPrefKey = "ikistudio_ide_uvim_focus";
 
-		public static string DefaultServerPipe =>
-			IsWindows ? @"\\.\pipe\unity.pipe" : "/tmp/unity.pipe";
+		public const string DefaultServerPipe = "/tmp/unity.pipe";
 
 		// `+{line}` rather than `+call cursor({line},{column})`: same jump, but no spaces, so the
 		// argument survives `open --args` and the shell without needing to be quoted.
-		public static string DefaultTerminalCommand
-		{
-			get
-			{
-				if (IsMacOS)
-					return "open -na Ghostty --args --working-directory={project} -e {nvim} --listen {pipe} +{line} {file}";
-				if (IsWindows)
-					return "wt.exe -d {project} {nvim} --listen {pipe} +{line} {file}";
-				return "ghostty --working-directory={project} -e {nvim} --listen {pipe} +{line} {file}";
-			}
-		}
+		public const string DefaultTerminalCommand =
+			"open -na Ghostty --args --working-directory={project} -e {nvim} --listen {pipe} +{line} {file}";
+
+		// Run after sending a file to an already-running Neovim, to raise its terminal.
+		public const string DefaultFocusCommand = "open -a Ghostty";
 
 		public static string ServerPipe
 		{
@@ -48,8 +42,11 @@ namespace Kunal.Ide.Neovim
 			set => EditorPrefs.SetString(TerminalPrefKey, value);
 		}
 
-		private static bool IsWindows => Application.platform == RuntimePlatform.WindowsEditor;
-		private static bool IsMacOS => Application.platform == RuntimePlatform.OSXEditor;
+		public static string FocusCommand
+		{
+			get => EditorPrefs.GetString(FocusPrefKey, DefaultFocusCommand);
+			set => EditorPrefs.SetString(FocusPrefKey, value);
+		}
 
 		public static bool Open(string nvimPath, string file, int line, int column)
 		{
@@ -72,7 +69,7 @@ namespace Kunal.Ide.Neovim
 
 		/// <summary>
 		/// nvim --server PIPE --remote-* only succeeds if something is actually listening.
-		/// On unix the socket exists as a file; on Windows named pipes are not visible to File.Exists.
+		/// The socket exists as a file, so File.Exists is a cheap way to check first.
 		/// </summary>
 		private static bool TrySendToRunningInstance(string nvimPath, string file, int line, int column)
 		{
@@ -80,7 +77,7 @@ namespace Kunal.Ide.Neovim
 			if (string.IsNullOrEmpty(pipe))
 				return false;
 
-			if (!IsWindows && !File.Exists(pipe))
+			if (!File.Exists(pipe))
 				return false;
 
 			if (string.IsNullOrEmpty(file))
@@ -115,10 +112,7 @@ namespace Kunal.Ide.Neovim
 				.Replace("{column}", column.ToString())
 				.Replace("{project}", Quote(projectRoot));
 
-			if (IsWindows)
-				return Run("cmd.exe", $"/c {command}");
-
-			return Run("/bin/sh", $"-c {Quote(command)}");
+			return RunShell(command);
 		}
 
 		/// <summary>
@@ -126,20 +120,20 @@ namespace Kunal.Ide.Neovim
 		/// </summary>
 		private static void FocusTerminal()
 		{
-			if (!IsMacOS)
+			var command = FocusCommand;
+			if (string.IsNullOrEmpty(command))
 				return;
 
-			// Derive the app from the configured terminal command rather than hardcoding Ghostty.
-			var command = TerminalCommand ?? "";
-			var marker = "open -na ";
-			var index = command.IndexOf(marker, StringComparison.Ordinal);
-			if (index < 0)
-				return;
+			RunShell(command);
+		}
 
-			var rest = command.Substring(index + marker.Length);
-			var app = rest.Split(' ')[0];
-			if (!string.IsNullOrEmpty(app))
-				Run("open", $"-a {Quote(app)}");
+		/// <summary>
+		/// Hand a command line to the shell, so the configured commands can use shell syntax
+		/// (quoting, `;`, loops) rather than being limited to a single executable.
+		/// </summary>
+		private static bool RunShell(string command)
+		{
+			return Run("/bin/sh", $"-c {Quote(command)}");
 		}
 
 		private static bool Run(string file, string args)

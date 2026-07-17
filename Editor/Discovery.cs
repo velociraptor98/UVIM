@@ -5,28 +5,20 @@ using System.IO;
 using System.Linq;
 using Unity.CodeEditor;
 
-namespace Kunal.Ide.Neovim
+namespace IkiStudio.Ide.Uvim
 {
 	/// <summary>
 	/// Locates nvim binaries so Unity can list them in the External Tools dropdown.
+	/// macOS only — see <see cref="NeovimScriptEditor"/>.
 	/// </summary>
 	internal static class Discovery
 	{
+		// Apple Silicon homebrew, Intel homebrew, MacPorts.
 		private static readonly string[] WellKnownPaths =
 		{
-			// macOS (Apple Silicon homebrew, Intel homebrew, MacPorts)
 			"/opt/homebrew/bin/nvim",
 			"/usr/local/bin/nvim",
 			"/opt/local/bin/nvim",
-			// Linux
-			"/usr/bin/nvim",
-			"/usr/local/bin/nvim",
-			"/snap/bin/nvim",
-			"/var/lib/flatpak/exports/bin/io.neovim.nvim",
-			"/home/linuxbrew/.linuxbrew/bin/nvim",
-			// Windows
-			@"C:\Program Files\Neovim\bin\nvim.exe",
-			@"C:\tools\neovim\Neovim\bin\nvim.exe",
 		};
 
 		public static CodeEditor.Installation[] GetInstallations()
@@ -92,16 +84,12 @@ namespace Kunal.Ide.Neovim
 
 		private static string RunWhich()
 		{
-			var isWindows = Path.DirectorySeparatorChar == '\\';
-			var file = isWindows ? "where" : "/bin/sh";
 			// A login shell so PATH matches what the user's terminal sees (homebrew, mise, asdf...).
-			var args = isWindows ? "nvim" : "-lc \"command -v nvim\"";
-
 			try
 			{
 				using (var process = new Process())
 				{
-					process.StartInfo = new ProcessStartInfo(file, args)
+					process.StartInfo = new ProcessStartInfo("/bin/sh", "-lc \"command -v nvim\"")
 					{
 						UseShellExecute = false,
 						RedirectStandardOutput = true,

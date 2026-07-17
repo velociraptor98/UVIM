@@ -1,9 +1,9 @@
 {
-  "name": "com.kunal.ide.neovim",
+  "name": "com.ikistudio.ide.uvim",
   "displayName": "Neovim Editor",
   "version": "0.1.0",
   "unity": "2019.4",
-  "description": "Use Neovim as Unity's External Script Editor. Registers Neovim in External Tools, generates .csproj/.sln for LSP, and opens files at the right line in an already-running Neovim.",
+  "description": "Use Neovim as Unity's External Script Editor. Registers Neovim in External Tools, generates .csproj/.sln for LSP, and opens files at the right line in an already-running Neovim. macOS only.",
   "keywords": [
     "neovim",
     "nvim",
