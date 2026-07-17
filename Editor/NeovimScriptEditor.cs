@@ -9,10 +9,9 @@ namespace IkiStudio.Ide.Uvim
 	/// <summary>
 	/// Registers Neovim as an External Script Editor.
 	///
-	/// macOS only. Spawning and focusing a terminal has no portable form — every part of it
-	/// (`open -na`, `/bin/sh`, the socket in /tmp) is platform-specific — so rather than ship
-	/// defaults for platforms that are not exercised, this simply does not register elsewhere
-	/// and Unity keeps offering its usual editors.
+	/// macOS only. The socket default (/tmp/unity.pipe) and the process handling are not
+	/// exercised on other platforms, so rather than ship defaults that are untested, this
+	/// simply does not register elsewhere and Unity keeps offering its usual editors.
 	///
 	/// Project file generation is delegated to the MIT-licensed generator shipped in
 	/// com.unity.ide.visualstudio rather than reimplemented, so the .csproj/.sln files
@@ -71,30 +70,13 @@ namespace IkiStudio.Ide.Uvim
 			EditorGUILayout.LabelField("Neovim", EditorStyles.boldLabel);
 
 			NeovimLauncher.ServerPipe = EditorGUILayout.TextField(
-				new GUIContent("Server pipe", "Neovim's --listen socket. If a Neovim is already listening here, files open in it instead of spawning a new window."),
+				new GUIContent("Server pipe", "Neovim's --listen socket. Files open in whichever Neovim is listening here."),
 				NeovimLauncher.ServerPipe);
 
-			EditorGUILayout.LabelField(new GUIContent("Terminal command"), EditorStyles.miniBoldLabel);
 			EditorGUILayout.HelpBox(
-				"Run when no Neovim is listening on the pipe.\n" +
-				"Placeholders: {nvim} {pipe} {file} {line} {column} {project}",
+				$"Start Neovim in any terminal with:\n    nvim --listen {NeovimLauncher.ServerPipe}\n" +
+				"Files from Unity then open in that session.",
 				MessageType.None);
-			NeovimLauncher.TerminalCommand = EditorGUILayout.TextArea(
-				NeovimLauncher.TerminalCommand, GUILayout.Height(38));
-
-			if (GUILayout.Button("Reset terminal command to default"))
-				NeovimLauncher.TerminalCommand = NeovimLauncher.DefaultTerminalCommand;
-
-			EditorGUILayout.LabelField(new GUIContent("Focus command"), EditorStyles.miniBoldLabel);
-			EditorGUILayout.HelpBox(
-				"Run to raise the terminal after sending a file to a running Neovim. " +
-				"Leave empty to never focus.",
-				MessageType.None);
-			NeovimLauncher.FocusCommand = EditorGUILayout.TextArea(
-				NeovimLauncher.FocusCommand, GUILayout.Height(19));
-
-			if (GUILayout.Button("Reset focus command to default"))
-				NeovimLauncher.FocusCommand = NeovimLauncher.DefaultFocusCommand;
 
 			EditorGUILayout.Space();
 			EditorGUILayout.LabelField("Generate .csproj files for:");
