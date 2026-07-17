@@ -1,0 +1,18 @@
+{
+    "name": "Kunal.Ide.Neovim",
+    "rootNamespace": "Kunal.Ide.Neovim",
+    "references": [
+        "Unity.VisualStudio.Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
