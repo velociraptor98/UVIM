@@ -78,6 +78,17 @@ In **Preferences → External Tools**, with Neovim selected:
 | **Generate .csproj files for** | Which package types get project files. Same flags as the Visual Studio package (they share storage). |
 | **Regenerate project files** | Force a full re-sync. |
 
+Project files go stale when the Unity editor version changes — every `.csproj` points at DLLs
+under `/Applications/Unity/Hub/Editor/<old version>/` and the LSP loses all Unity types until
+they are regenerated. After an upgrade, either click **Regenerate project files** or run it
+headless (with the project closed):
+
+```sh
+"/Applications/Unity/Hub/Editor/<version>/Unity.app/Contents/MacOS/Unity" \
+  -batchmode -quit -projectPath <project> \
+  -executeMethod IkiStudio.Ide.Uvim.ProjectFileSync.SyncAll
+```
+
 If you run several Unity projects at once, give each one its own socket — point **Server pipe** at
 a distinct path and start that project's Neovim with the matching `--listen`.
 
@@ -111,6 +122,35 @@ vim.lsp.config("roslyn", {
   },
 })
 ```
+
+### macOS: Roslyn needs Mono's reference assemblies
+
+Unity generates legacy .NET Framework projects. Roslyn's build host wants Mono MSBuild for
+those; Homebrew's `mono` ships without it, so Roslyn falls back to the .NET SDK — which then
+cannot resolve framework references (`netstandard`, `System.*`) and completion silently
+returns nothing for every Unity type. Point reference resolution at Mono's bundled reference
+assemblies instead (`brew install mono` provides them):
+
+```lua
+local cmd_env
+local mono = vim.fn.exepath("mono")
+if mono ~= "" then
+  local api_dir = vim.fs.normalize(vim.fn.resolve(mono) .. "/../../lib/mono/4.7.1-api")
+  if vim.uv.fs_stat(api_dir) then
+    cmd_env = { FrameworkPathOverride = api_dir }
+  end
+end
+vim.lsp.config("roslyn", { cmd_env = cmd_env })
+```
+
+The `Mono MSBuild could not be found` warning in `~/.local/state/nvim/lsp.log` still prints —
+that is expected; the override fixes resolution, not discovery.
+
+### First load is slow
+
+Roslyn loads the entire solution before it can answer anything. On a Unity project this
+takes a minute or two after the first `.cs` buffer opens; completion is empty until then.
+This is once per session — subsequent files are instant.
 
 ## Not included
 

@@ -21,7 +21,18 @@ namespace IkiStudio.Ide.Uvim
 			"/opt/local/bin/nvim",
 		};
 
+		private static CodeEditor.Installation[] _cache;
+
 		public static CodeEditor.Installation[] GetInstallations()
+		{
+			// Unity queries installations while drawing the Preferences window; without a
+			// cache every repaint spawns a login shell (RunWhich) and stalls the UI.
+			if (_cache == null)
+				_cache = FindInstallations();
+			return _cache;
+		}
+
+		private static CodeEditor.Installation[] FindInstallations()
 		{
 			var found = new List<CodeEditor.Installation>();
 			var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.1] - 2026-07-19
+
+### Added
+- `ProjectFileSync.SyncAll`, a batch-mode `-executeMethod` entry point so project files can be
+  regenerated headlessly after a Unity editor upgrade.
+- README: macOS section on `FrameworkPathOverride` (Homebrew mono has no MSBuild, which
+  silently breaks all framework references in Roslyn), headless regeneration, and first-load
+  latency.
+
+### Changed
+- Installation discovery is cached; previously every query from the Preferences window spawned
+  a login shell.
+
 ## [0.1.0] - 2026-07-17
 
 ### Added
