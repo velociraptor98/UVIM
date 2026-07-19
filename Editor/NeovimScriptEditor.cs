@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Microsoft.Unity.VisualStudio.Editor;
 using Unity.CodeEditor;
@@ -20,7 +21,30 @@ namespace IkiStudio.Ide.Uvim
 	[InitializeOnLoad]
 	public class NeovimScriptEditor : IExternalCodeEditor
 	{
-		private readonly IGenerator _generator = new ProjectGeneration();
+		private readonly IGenerator _generator = CreateGenerator();
+
+		/// <summary>
+		/// The public ProjectGeneration base is not usable directly: its GetProjectHeader is a
+		/// stub that leaves the header null, so Sync() writes the solution and then throws
+		/// NullReferenceException on the first .csproj. The real generators are internal and
+		/// normally reached through the selected Visual Studio product's installation — which
+		/// does not exist when Neovim is the selected editor. Instantiate the SDK-style one
+		/// reflectively; its projects (and .slnx solution) also load in Roslyn-based LSPs with
+		/// the plain .NET SDK, no Mono MSBuild required.
+		/// </summary>
+		internal static IGenerator CreateGenerator()
+		{
+			var type = typeof(ProjectGeneration).Assembly
+				.GetType("Microsoft.Unity.VisualStudio.Editor.SdkStyleProjectGeneration");
+
+			if (type != null && Activator.CreateInstance(type) is IGenerator generator)
+				return generator;
+
+			Debug.LogError(
+				"[Neovim] com.unity.ide.visualstudio no longer exposes SdkStyleProjectGeneration; " +
+				"project generation will produce no .csproj files. Pin com.unity.ide.visualstudio to 2.0.x.");
+			return new ProjectGeneration();
+		}
 
 		static NeovimScriptEditor()
 		{

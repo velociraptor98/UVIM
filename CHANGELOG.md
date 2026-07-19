@@ -2,6 +2,15 @@
 
 ## [0.1.1] - 2026-07-19
 
+### Fixed
+- Project generation crashed with NullReferenceException after writing the solution, leaving
+  no `.csproj` files at all: the public `ProjectGeneration` base emits a null project header —
+  the real generators are internal and only reachable through a Visual Studio installation,
+  which never exists when Neovim is the selected editor. Generation now goes through the
+  package's SDK-style generator (obtained reflectively). This also means generated projects
+  (`.slnx` + SDK-style `.csproj`) load in Roslyn LSPs with the plain .NET SDK — no Mono
+  MSBuild needed.
+
 ### Added
 - `ProjectFileSync.SyncAll`, a batch-mode `-executeMethod` entry point so project files can be
   regenerated headlessly after a Unity editor upgrade.

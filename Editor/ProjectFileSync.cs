@@ -1,5 +1,3 @@
-using Microsoft.Unity.VisualStudio.Editor;
-
 namespace IkiStudio.Ide.Uvim
 {
 	/// <summary>
@@ -15,7 +13,7 @@ namespace IkiStudio.Ide.Uvim
 	{
 		public static void SyncAll()
 		{
-			new ProjectGeneration().Sync();
+			NeovimScriptEditor.CreateGenerator().Sync();
 		}
 	}
 }
