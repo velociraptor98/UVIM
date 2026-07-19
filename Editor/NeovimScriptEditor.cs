@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using Microsoft.Unity.VisualStudio.Editor;
 using Unity.CodeEditor;
@@ -99,18 +100,42 @@ namespace IkiStudio.Ide.Uvim
 			return NeovimLauncher.Open(CodeEditor.CurrentEditorInstallation, path, line, column);
 		}
 
+		private string _connectionStatus;
+
 		public void OnGUI()
 		{
 			EditorGUILayout.LabelField("Neovim", EditorStyles.boldLabel);
 
-			NeovimLauncher.ServerPipe = EditorGUILayout.TextField(
+			var pipe = NeovimLauncher.ServerPipe;
+			var newPipe = EditorGUILayout.TextField(
 				new GUIContent("Server pipe", "Neovim's --listen socket. Files open in whichever Neovim is listening here."),
-				NeovimLauncher.ServerPipe);
+				pipe);
+			if (newPipe != pipe)
+			{
+				NeovimLauncher.ServerPipe = newPipe;
+				pipe = newPipe;
+				_connectionStatus = null;
+			}
 
 			EditorGUILayout.HelpBox(
-				$"Start Neovim in any terminal with:\n    nvim --listen {NeovimLauncher.ServerPipe}\n" +
-				"Files from Unity then open in that session.",
+				(File.Exists(pipe)
+					? "Socket file present. Files from Unity open in the Neovim listening here."
+					: "No socket yet — start Neovim in any terminal with:") +
+				$"\n    nvim --listen {pipe}",
 				MessageType.None);
+
+			EditorGUILayout.BeginHorizontal();
+			if (GUILayout.Button("Test connection", GUILayout.Width(130)))
+				_connectionStatus = NeovimLauncher.TestConnection(CodeEditor.CurrentEditorInstallation);
+			if (GUILayout.Button("Copy launch command", GUILayout.Width(170)))
+			{
+				EditorGUIUtility.systemCopyBuffer = $"nvim --listen {pipe}";
+				_connectionStatus = "Launch command copied to clipboard.";
+			}
+			EditorGUILayout.EndHorizontal();
+
+			if (!string.IsNullOrEmpty(_connectionStatus))
+				EditorGUILayout.HelpBox(_connectionStatus, MessageType.None);
 
 			if (Generator == null)
 			{

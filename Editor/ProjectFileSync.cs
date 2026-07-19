@@ -1,3 +1,6 @@
+using Unity.CodeEditor;
+using UnityEditor;
+
 namespace IkiStudio.Ide.Uvim
 {
 	/// <summary>
@@ -8,9 +11,26 @@ namespace IkiStudio.Ide.Uvim
 	///   Unity -batchmode -quit -projectPath &lt;project&gt; -executeMethod IkiStudio.Ide.Uvim.ProjectFileSync.SyncAll
 	///
 	/// Fails if the project is already open in an editor — Unity holds a lock per project.
+	/// Also exposes the same action as an Assets menu item.
 	/// </summary>
 	public static class ProjectFileSync
 	{
+		private const string MenuPath = "Assets/Regenerate Project Files";
+
+		[MenuItem(MenuPath)]
+		private static void RegenerateFromMenu()
+		{
+			SyncAll();
+		}
+
+		// Only meaningful while Neovim owns generation; Rider/Visual Studio manage their own
+		// project files and regenerating over them would just cause churn.
+		[MenuItem(MenuPath, true)]
+		private static bool RegenerateFromMenuValidation()
+		{
+			return CodeEditor.Editor.CurrentCodeEditor is NeovimScriptEditor;
+		}
+
 		public static void SyncAll()
 		{
 			var generator = NeovimScriptEditor.Generator;

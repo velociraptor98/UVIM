@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using UnityEditor;
 using Debug = UnityEngine.Debug;
 
@@ -18,7 +19,42 @@ namespace IkiStudio.Ide.Uvim
 	{
 		private const string PipePrefKey = "ikistudio_ide_uvim_pipe";
 
-		public const string DefaultServerPipe = "/tmp/unity.pipe";
+		private static string _defaultServerPipe;
+
+		/// <summary>
+		/// Per-project default, so several Unity projects each talk to their own Neovim with no
+		/// configuration: /tmp/unity-&lt;project&gt;-&lt;hash&gt;.pipe. The name keeps it recognizable
+		/// in `ls /tmp`; the hash disambiguates projects that share a folder name.
+		/// </summary>
+		public static string DefaultServerPipe
+		{
+			get
+			{
+				if (_defaultServerPipe == null)
+				{
+					var root = Directory.GetParent(UnityEngine.Application.dataPath).FullName;
+					_defaultServerPipe = $"/tmp/unity-{SanitizeName(Path.GetFileName(root))}-{(Fnv1a(root) & 0xffff):x4}.pipe";
+				}
+				return _defaultServerPipe;
+			}
+		}
+
+		private static string SanitizeName(string name)
+		{
+			var builder = new StringBuilder(name.Length);
+			foreach (var c in name.ToLowerInvariant())
+				builder.Append(char.IsLetterOrDigit(c) ? c : '-');
+			return builder.ToString();
+		}
+
+		private static uint Fnv1a(string text)
+		{
+			// string.GetHashCode is not guaranteed stable across runs; the socket name must be.
+			var hash = 2166136261u;
+			foreach (var c in text)
+				hash = (hash ^ c) * 16777619u;
+			return hash;
+		}
 
 		/// <summary>
 		/// Stored per project (EditorUserSettings), not per user: running several Unity projects
@@ -36,6 +72,26 @@ namespace IkiStudio.Ide.Uvim
 				return EditorPrefs.GetString(PipePrefKey, DefaultServerPipe);
 			}
 			set => EditorUserSettings.SetConfigValue(PipePrefKey, value);
+		}
+
+		/// <summary>
+		/// True liveness check: --remote-expr round-trips to the server, so unlike a
+		/// File.Exists probe it fails on a socket file that survived a crash with nothing
+		/// listening behind it. Returns a human-readable status for the Preferences UI.
+		/// </summary>
+		public static string TestConnection(string nvimPath)
+		{
+			var pipe = ServerPipe;
+
+			if (string.IsNullOrEmpty(nvimPath))
+				return "No Neovim executable selected.";
+
+			if (!File.Exists(pipe))
+				return $"No socket at '{pipe}'. Start Neovim with: nvim --listen {pipe}";
+
+			return Run(nvimPath, $"--server {Quote(pipe)} --remote-expr 1")
+				? "Connected — Neovim is listening."
+				: "Socket exists but nothing answered. Remove the stale socket and restart Neovim.";
 		}
 
 		public static bool Open(string nvimPath, string file, int line, int column)

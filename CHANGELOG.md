@@ -12,6 +12,16 @@
   MSBuild needed.
 
 ### Added
+- Project files regenerate automatically on the first load with a new Unity editor version —
+  previously an upgrade left every `.csproj` pointing at the old editor's DLLs and the LSP
+  silently lost all Unity types until a manual regeneration.
+- **Test connection** and **Copy launch command** buttons plus a socket-status line in
+  Preferences. The test round-trips through `--remote-expr`, so it catches a stale socket
+  file left by a crashed Neovim, which a plain file check cannot.
+- The default server pipe is per project (`/tmp/unity-<project>-<hash>.pipe`), so several
+  Unity projects work side by side with no configuration.
+- **Assets → Regenerate Project Files** menu item (enabled while Neovim is the selected
+  editor); same action as the Preferences button, and bindable to a shortcut.
 - `ProjectFileSync.SyncAll`, a batch-mode `-executeMethod` entry point so project files can be
   regenerated headlessly after a Unity editor upgrade.
 - README: step-by-step Neovim setup guide (SDK + language server install, roslyn.nvim spec

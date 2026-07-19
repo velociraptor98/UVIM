@@ -42,26 +42,28 @@ Then **Edit → Preferences → External Tools → External Script Editor → Ne
 
 ## How opening a file works
 
-You start Neovim listening on a socket (`/tmp/unity.pipe` by default). When you open a file from
-Unity, it is sent to that instance with `--remote-silent` and the cursor is moved to the line.
-Your session, buffers, and LSP stay warm.
+You start Neovim listening on a socket. The default is per project —
+`/tmp/unity-<project>-<hash>.pipe` — so several Unity projects each talk to their own Neovim
+without any configuration. When you open a file from Unity, it is sent to that instance with
+`--remote-silent` and the cursor is moved to the line. Your session, buffers, and LSP stay warm.
 
 If nothing is listening on the socket, nothing opens and a Console warning tells you how to start
 one. This package will not spawn Neovim for you — that would mean choosing a terminal emulator on
 your behalf, and this way any terminal, multiplexer, or remote session works the same.
 
-Start Neovim with the socket:
+Start Neovim with the socket — **Preferences → External Tools** shows the exact command, and
+**Copy launch command** puts it on the clipboard:
 
 ```sh
-nvim --listen /tmp/unity.pipe
+nvim --listen /tmp/unity-myproject-1a2b.pipe
 ```
 
-Or always listen, from your Neovim config:
+Or always listen, from your Neovim config (match the pipe shown in Preferences):
 
 ```lua
 vim.api.nvim_create_autocmd("VimEnter", {
   callback = function()
-    local pipe = "/tmp/unity.pipe"
+    local pipe = "/tmp/unity-myproject-1a2b.pipe"
     if vim.fn.filereadable(pipe) == 0 then
       pcall(vim.fn.serverstart, pipe)
     end
@@ -75,13 +77,16 @@ In **Preferences → External Tools**, with Neovim selected:
 
 | Setting | Meaning |
 |---|---|
-| **Server pipe** | Socket to look for a running Neovim on. Default `/tmp/unity.pipe`. |
+| **Server pipe** | Socket to look for a running Neovim on. Per-project default `/tmp/unity-<project>-<hash>.pipe`, stored per project in `UserSettings/`. |
+| **Test connection** | Round-trips to the socket, so it distinguishes a live Neovim from a stale socket file left by a crash. |
+| **Copy launch command** | Puts `nvim --listen <pipe>` on the clipboard. |
 | **Generate .csproj files for** | Which package types get project files. Same flags as the Visual Studio package (they share storage). |
-| **Regenerate project files** | Force a full re-sync. |
+| **Regenerate project files** | Force a full re-sync. Also available as **Assets → Regenerate Project Files**. |
 
 Project files go stale when the Unity editor version changes — every `.csproj` points at DLLs
 under `/Applications/Unity/Hub/Editor/<old version>/` and the LSP loses all Unity types until
-they are regenerated. After an upgrade, either click **Regenerate project files** or run it
+they are regenerated. The package handles this automatically: on the first load with a new
+editor version it regenerates and logs a line to the Console. Regeneration can also be run
 headless (with the project closed):
 
 ```sh
@@ -90,9 +95,9 @@ headless (with the project closed):
   -executeMethod IkiStudio.Ide.Uvim.ProjectFileSync.SyncAll
 ```
 
-If you run several Unity projects at once, give each one its own socket — point **Server pipe** at
-a distinct path and start that project's Neovim with the matching `--listen`. The setting is
-stored per project (in `UserSettings/`), so each project keeps its own value.
+Running several Unity projects at once needs no setup: the default socket path is already
+distinct per project, and the setting is stored per project too. Just start each project's
+Neovim with the `--listen` command its own Preferences shows.
 
 Files are sent to Neovim in the background; your terminal is not raised. Bind a hotkey in your
 window manager or terminal to switch to it, whatever you already use.
@@ -179,11 +184,12 @@ In Unity, with Neovim selected as the external editor: **Preferences → Externa
 Regenerate project files** (afterwards Unity keeps them in sync on script changes). You
 should see a `.slnx` and one `.csproj` per assembly in the project root.
 
-Then start Neovim in the project root and open any script:
+Then start Neovim in the project root and open any script (copy the exact command with
+**Copy launch command** in Preferences):
 
 ```sh
 cd /path/to/your-unity-project
-nvim --listen /tmp/unity.pipe Assets/Scripts/Player.cs
+nvim --listen /tmp/unity-yourproject-1a2b.pipe Assets/Scripts/Player.cs
 ```
 
 Give the server a minute on first open (see below), then completion, go-to-definition, and
