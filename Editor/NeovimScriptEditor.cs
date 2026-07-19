@@ -15,13 +15,19 @@ namespace IkiStudio.Ide.Uvim
 	/// simply does not register elsewhere and Unity keeps offering its usual editors.
 	///
 	/// Project file generation is delegated to the MIT-licensed generator shipped in
-	/// com.unity.ide.visualstudio rather than reimplemented, so the .csproj/.sln files
-	/// Neovim's LSP consumes are byte-for-byte the ones Visual Studio would get.
+	/// com.unity.ide.visualstudio rather than reimplemented: the SDK-style .csproj/.slnx it
+	/// writes are exactly what that package produces for VS Code, and Roslyn-based LSPs load
+	/// them with the plain .NET SDK — no Mono MSBuild required.
 	/// </summary>
 	[InitializeOnLoad]
 	public class NeovimScriptEditor : IExternalCodeEditor
 	{
-		private readonly IGenerator _generator = CreateGenerator();
+		// Lazy so the reflection (and any failure logging) runs when generation is first
+		// needed, not on every domain reload. Value is null when the generator could not be
+		// created; callers degrade — generation is skipped but files still open in Neovim.
+		private static readonly Lazy<IGenerator> LazyGenerator = new Lazy<IGenerator>(CreateGenerator);
+
+		internal static IGenerator Generator => LazyGenerator.Value;
 
 		/// <summary>
 		/// The public ProjectGeneration base is not usable directly: its GetProjectHeader is a
@@ -29,10 +35,10 @@ namespace IkiStudio.Ide.Uvim
 		/// NullReferenceException on the first .csproj. The real generators are internal and
 		/// normally reached through the selected Visual Studio product's installation — which
 		/// does not exist when Neovim is the selected editor. Instantiate the SDK-style one
-		/// reflectively; its projects (and .slnx solution) also load in Roslyn-based LSPs with
-		/// the plain .NET SDK, no Mono MSBuild required.
+		/// reflectively; returns null (rather than the broken base) if the internal type ever
+		/// moves, so failure is a clear Console error instead of a half-written solution.
 		/// </summary>
-		internal static IGenerator CreateGenerator()
+		private static IGenerator CreateGenerator()
 		{
 			var type = typeof(ProjectGeneration).Assembly
 				.GetType("Microsoft.Unity.VisualStudio.Editor.SdkStyleProjectGeneration");
@@ -42,8 +48,8 @@ namespace IkiStudio.Ide.Uvim
 
 			Debug.LogError(
 				"[Neovim] com.unity.ide.visualstudio no longer exposes SdkStyleProjectGeneration; " +
-				"project generation will produce no .csproj files. Pin com.unity.ide.visualstudio to 2.0.x.");
-			return new ProjectGeneration();
+				"project file generation is disabled. Pin com.unity.ide.visualstudio to a 2.0.x version.");
+			return null;
 		}
 
 		static NeovimScriptEditor()
@@ -67,24 +73,28 @@ namespace IkiStudio.Ide.Uvim
 
 		public void SyncAll()
 		{
-			_generator.Sync();
+			Generator?.Sync();
 		}
 
 		public void SyncIfNeeded(string[] addedFiles, string[] deletedFiles, string[] movedFiles, string[] movedFromFiles, string[] importedFiles)
 		{
-			_generator.SyncIfNeeded(
+			Generator?.SyncIfNeeded(
 				addedFiles.Union(deletedFiles).Union(movedFiles).Union(movedFromFiles),
 				importedFiles);
 		}
 
 		public bool OpenProject(string path, int line, int column)
 		{
-			// path is empty for "Open C# Project" — we still want to open the editor, just with no file.
-			if (!string.IsNullOrEmpty(path) && !_generator.IsSupportedFile(path))
-				return false;
+			var generator = Generator;
+			if (generator != null)
+			{
+				// path is empty for "Open C# Project" — we still want to open the editor, just with no file.
+				if (!string.IsNullOrEmpty(path) && !generator.IsSupportedFile(path))
+					return false;
 
-			if (!_generator.HasSolutionBeenGenerated())
-				_generator.Sync();
+				if (!generator.HasSolutionBeenGenerated())
+					generator.Sync();
+			}
 
 			return NeovimLauncher.Open(CodeEditor.CurrentEditorInstallation, path, line, column);
 		}
@@ -101,6 +111,15 @@ namespace IkiStudio.Ide.Uvim
 				$"Start Neovim in any terminal with:\n    nvim --listen {NeovimLauncher.ServerPipe}\n" +
 				"Files from Unity then open in that session.",
 				MessageType.None);
+
+			if (Generator == null)
+			{
+				EditorGUILayout.HelpBox(
+					"Project file generation is unavailable — the installed com.unity.ide.visualstudio " +
+					"is incompatible. See the Console for details.",
+					MessageType.Error);
+				return;
+			}
 
 			EditorGUILayout.Space();
 			EditorGUILayout.LabelField("Generate .csproj files for:");
@@ -119,10 +138,10 @@ namespace IkiStudio.Ide.Uvim
 
 		private void SettingsButton(ProjectGenerationFlag preference, string label)
 		{
-			var prevValue = _generator.AssemblyNameProvider.ProjectGenerationFlag.HasFlag(preference);
+			var prevValue = Generator.AssemblyNameProvider.ProjectGenerationFlag.HasFlag(preference);
 			var newValue = EditorGUILayout.Toggle(label, prevValue);
 			if (newValue != prevValue)
-				_generator.AssemblyNameProvider.ToggleProjectGeneration(preference);
+				Generator.AssemblyNameProvider.ToggleProjectGeneration(preference);
 		}
 
 		private void RegenerateButton()
@@ -130,7 +149,7 @@ namespace IkiStudio.Ide.Uvim
 			EditorGUILayout.BeginHorizontal();
 			EditorGUILayout.PrefixLabel("");
 			if (GUILayout.Button("Regenerate project files", GUILayout.Width(220)))
-				_generator.Sync();
+				Generator.Sync();
 			EditorGUILayout.EndHorizontal();
 		}
 	}

@@ -26,7 +26,9 @@ namespace IkiStudio.Ide.Uvim
 		public static CodeEditor.Installation[] GetInstallations()
 		{
 			// Unity queries installations while drawing the Preferences window; without a
-			// cache every repaint spawns a login shell (RunWhich) and stalls the UI.
+			// cache every repaint spawns a login shell (RunWhich) and stalls the UI. Cached
+			// until the next domain reload — an nvim installed mid-session shows up after the
+			// next script recompile.
 			if (_cache == null)
 				_cache = FindInstallations();
 			return _cache;
@@ -100,24 +102,27 @@ namespace IkiStudio.Ide.Uvim
 			{
 				using (var process = new Process())
 				{
+					// stderr is deliberately not redirected: rc files can be chatty, and an unread
+					// redirected pipe that fills up would deadlock the wait below.
 					process.StartInfo = new ProcessStartInfo("/bin/sh", "-lc \"command -v nvim\"")
 					{
 						UseShellExecute = false,
 						RedirectStandardOutput = true,
-						RedirectStandardError = true,
 						CreateNoWindow = true,
 					};
 					process.Start();
-					var output = process.StandardOutput.ReadToEnd();
 
-					// Guard against a shell that never returns (bad rc file, prompt waiting on input).
+					// Wait BEFORE reading: ReadToEnd blocks until stdout closes, so a shell that
+					// hangs (bad rc file, prompt waiting on input) would freeze the editor and a
+					// timeout placed after the read could never fire. The output is one short
+					// line, so it cannot fill the pipe buffer and stall the shell either.
 					if (!process.WaitForExit(3000))
 					{
 						try { process.Kill(); } catch { /* already gone */ }
 						return null;
 					}
 
-					return output;
+					return process.StandardOutput.ReadToEnd();
 				}
 			}
 			catch

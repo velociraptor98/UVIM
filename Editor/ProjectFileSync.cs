@@ -13,7 +13,16 @@ namespace IkiStudio.Ide.Uvim
 	{
 		public static void SyncAll()
 		{
-			NeovimScriptEditor.CreateGenerator().Sync();
+			var generator = NeovimScriptEditor.Generator;
+			if (generator == null)
+			{
+				// Throw rather than return so batch mode exits non-zero; the specific cause was
+				// already logged by NeovimScriptEditor.
+				throw new System.InvalidOperationException(
+					"Project file generation is unavailable — the installed com.unity.ide.visualstudio is incompatible.");
+			}
+
+			generator.Sync();
 		}
 	}
 }

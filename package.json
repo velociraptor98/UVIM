@@ -11,6 +11,6 @@
     "integration"
   ],
   "dependencies": {
-    "com.unity.ide.visualstudio": "2.0.22"
+    "com.unity.ide.visualstudio": "2.0.26"
   }
 }

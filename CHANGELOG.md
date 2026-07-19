@@ -18,9 +18,26 @@
   silently breaks all framework references in Roslyn), headless regeneration, and first-load
   latency.
 
+- The server pipe setting is now stored per project (EditorUserSettings) instead of per user
+  (EditorPrefs), so multi-project setups can actually have one socket per project as the README
+  describes. Existing EditorPrefs values are read as a fallback.
+- Opening a file waits for the remote open to be delivered before moving the cursor;
+  previously the two commands raced and the cursor could land in the previously focused buffer.
+- Remote commands now check the nvim exit code, so a stale socket (left by a crashed Neovim)
+  produces a Console warning instead of silently doing nothing.
+- Shell discovery of nvim waited for output before checking its timeout, so a hanging login
+  shell could freeze the editor UI indefinitely; the timeout now actually applies.
+- Unity's "no specific line" signal (-1) is respected: the session's cursor position is kept
+  instead of jumping to line 1.
+
 ### Changed
 - Installation discovery is cached; previously every query from the Preferences window spawned
   a login shell.
+- The generator is created lazily (first use, not every domain reload), and if the internal
+  generator type is ever unavailable the plugin disables generation with a clear Console error
+  instead of falling back to the broken base generator.
+- `com.unity.ide.visualstudio` dependency floor raised to 2.0.26, the version the reflection
+  into `SdkStyleProjectGeneration` is tested against.
 
 ## [0.1.0] - 2026-07-17
 
