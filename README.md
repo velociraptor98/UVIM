@@ -35,7 +35,7 @@ correct as Unity changes. SDK-style projects load in Roslyn-based LSPs with the 
 Package Manager → **Add package from git URL…**
 
 ```
-https://github.com/<you>/com.ikistudio.ide.uvim.git
+https://github.com/velociraptor98/UVIM.git
 ```
 
 Then **Edit → Preferences → External Tools → External Script Editor → Neovim**.
@@ -97,9 +97,28 @@ stored per project (in `UserSettings/`), so each project keeps its own value.
 Files are sent to Neovim in the background; your terminal is not raised. Bind a hotkey in your
 window manager or terminal to switch to it, whatever you already use.
 
-## Neovim side
+## Neovim setup
 
-Any C# LSP works. With [roslyn.nvim](https://github.com/seblyng/roslyn.nvim):
+Any Roslyn-based C# LSP works. The steps below get completion working with
+[roslyn.nvim](https://github.com/seblyng/roslyn.nvim) driving Microsoft's Roslyn language
+server — the same server VS Code uses.
+
+### 1. Install the .NET SDK and the language server
+
+The server runs on the .NET SDK:
+
+```sh
+brew install --cask dotnet-sdk
+```
+
+Then install the server itself. With [mason.nvim](https://github.com/mason-org/mason.nvim)
+it is in the default registry:
+
+```
+:MasonInstall roslyn-language-server
+```
+
+### 2. Install roslyn.nvim
 
 ```lua
 {
@@ -108,9 +127,38 @@ Any C# LSP works. With [roslyn.nvim](https://github.com/seblyng/roslyn.nvim):
   opts = {
     broad_search = true,      -- Unity projects often have several solutions
     filewatching = "roslyn",  -- more stable on large projects
+    -- Prefer the .slnx this package generates over any leftover legacy .sln
+    -- from a previous Rider/Visual Studio setup. Returning nil falls back to
+    -- the plugin's normal target prompt.
+    choose_target = function(targets)
+      local slnx = vim.tbl_filter(function(t)
+        return t:match("%.slnx$") ~= nil
+      end, targets)
+      if #slnx == 1 then
+        return slnx[1]
+      end
+    end,
   },
 }
 ```
+
+**LazyVim users:** also disable the C# servers LazyVim would otherwise auto-start, or they
+fight roslyn.nvim over `cs` buffers (omnisharp used to claim them outright; `roslyn_ls`
+attaches a second, duplicate client):
+
+```lua
+{
+  "neovim/nvim-lspconfig",
+  opts = {
+    servers = {
+      omnisharp = { enabled = false },
+      roslyn_ls = { enabled = false },
+    },
+  },
+}
+```
+
+### 3. Optional server settings
 
 Server settings go through `vim.lsp.config`, **not** the plugin's `opts`:
 
@@ -124,6 +172,22 @@ vim.lsp.config("roslyn", {
   },
 })
 ```
+
+### 4. Generate project files and open the project
+
+In Unity, with Neovim selected as the external editor: **Preferences → External Tools →
+Regenerate project files** (afterwards Unity keeps them in sync on script changes). You
+should see a `.slnx` and one `.csproj` per assembly in the project root.
+
+Then start Neovim in the project root and open any script:
+
+```sh
+cd /path/to/your-unity-project
+nvim --listen /tmp/unity.pipe Assets/Scripts/Player.cs
+```
+
+Give the server a minute on first open (see below), then completion, go-to-definition, and
+diagnostics work on Unity types.
 
 ### macOS: Roslyn needs Mono's reference assemblies (legacy projects only)
 
@@ -155,6 +219,15 @@ that is expected; the override fixes resolution, not discovery.
 Roslyn loads the entire solution before it can answer anything. On a Unity project this
 takes a minute or two after the first `.cs` buffer opens; completion is empty until then.
 This is once per session — subsequent files are instant.
+
+### If completion stays empty
+
+- `:checkhealth vim.lsp` / `:LspInfo` — is a client named `roslyn` attached?
+- `:Roslyn target` — if several solutions were found, make sure the `.slnx` is selected.
+- No `.csproj` files next to the solution means generation never ran — regenerate from
+  Unity's Preferences and check the Unity Console for errors.
+- The server's log is at `~/.local/state/nvim/lsp.log`; "unresolved dependencies" warnings
+  for a handful of package projects are normal, per-project load errors are not.
 
 ## Not included
 

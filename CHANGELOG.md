@@ -14,9 +14,10 @@
 ### Added
 - `ProjectFileSync.SyncAll`, a batch-mode `-executeMethod` entry point so project files can be
   regenerated headlessly after a Unity editor upgrade.
-- README: macOS section on `FrameworkPathOverride` (Homebrew mono has no MSBuild, which
-  silently breaks all framework references in Roslyn), headless regeneration, and first-load
-  latency.
+- README: step-by-step Neovim setup guide (SDK + language server install, roslyn.nvim spec
+  with `.slnx` target selection, LazyVim conflict note, troubleshooting), macOS section on
+  `FrameworkPathOverride` for legacy projects (Homebrew mono has no MSBuild, which silently
+  breaks all framework references in Roslyn), headless regeneration, and first-load latency.
 
 - The server pipe setting is now stored per project (EditorUserSettings) instead of per user
   (EditorPrefs), so multi-project setups can actually have one socket per project as the README
